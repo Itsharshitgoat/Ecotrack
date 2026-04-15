@@ -3,8 +3,8 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DatabaseManager {
     // Use environment variables for DB connection, fallback to defaults
@@ -31,20 +31,20 @@ public class DatabaseManager {
         }
     }
 
-    // Fetch Emission Factors to Cache locally
-    public Map<String, Double> loadEmissionFactors() {
-        Map<String, Double> factors = new HashMap<>();
-        String query = "SELECT activity_type, co2_per_unit FROM emission_factors";
+    // Dynamic factor fetching on demand
+    public double getFactorForActivity(String activityType) {
+        String query = "SELECT co2_per_unit FROM emission_factors WHERE activity_type = ?";
         try (Connection conn = connect();
-             PreparedStatement pstmt = conn.prepareStatement(query);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                factors.put(rs.getString("activity_type"), rs.getDouble("co2_per_unit"));
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, activityType);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getDouble("co2_per_unit");
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return factors;
+        return 0.0;
     }
 
     // Secure Insert for Activity Log
@@ -57,8 +57,39 @@ public class DatabaseManager {
             pstmt.setDouble(3, quantity);
             pstmt.setDouble(4, calculatedCo2);
             pstmt.executeUpdate();
+
+            // Optionally update user's total score in the users table
+            updateUserScore(userId, calculatedCo2);
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    private void updateUserScore(int userId, double calculatedCo2) {
+        String query = "UPDATE users SET total_score = total_score + ? WHERE user_id = ?";
+        try (Connection conn = connect();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setDouble(1, calculatedCo2);
+            pstmt.setInt(2, userId);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Fetch top users for leaderboard
+    public List<String> getTopUsers() {
+        List<String> leaders = new ArrayList<>();
+        String query = "SELECT username, total_score FROM users ORDER BY total_score ASC LIMIT 5";
+        try (Connection conn = connect();
+             PreparedStatement pstmt = conn.prepareStatement(query);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                leaders.add(rs.getString("username") + " - " + String.format("%.2f kg", rs.getDouble("total_score")));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return leaders;
     }
 }
