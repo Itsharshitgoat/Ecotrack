@@ -1,8 +1,6 @@
 import java.awt.*;
 import java.awt.event.*;
 import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
 
 public class EcoTrackDashboard extends Frame {
     // "Modern Eames" Palette
@@ -28,7 +26,6 @@ public class EcoTrackDashboard extends Frame {
     private Label sliderValueLabel;
     private Label projectionLabel;
     private Label liveMeterLabel;
-    private LeaderboardPanel leaderboardPanel;
     private FocusHearth hearth;
 
     // Custom Component: Tonal Card
@@ -81,44 +78,6 @@ public class EcoTrackDashboard extends Frame {
             g2d.fillRoundRect(40, 100, fillWidth, 12, 12, 12);
 
             super.paint(g);
-        }
-    }
-
-    // Custom Component: Structured Leaderboard Panel
-    class LeaderboardPanel extends TonalCard {
-        private List<DatabaseManager.LeaderData> leaders = new ArrayList<>();
-
-        public LeaderboardPanel(Color bgColor) {
-            super(bgColor);
-        }
-
-        public void updateLeaders(List<DatabaseManager.LeaderData> newLeaders) {
-            this.leaders = newLeaders;
-            repaint();
-        }
-
-        @Override
-        public void paint(Graphics g) {
-            super.paint(g);
-            Graphics2D g2d = (Graphics2D) g;
-            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            g2d.setFont(new Font("SansSerif", Font.PLAIN, 16));
-            int yOffset = 70;
-
-            for (int i = 0; i < leaders.size(); i++) {
-                DatabaseManager.LeaderData ld = leaders.get(i);
-                // Fake table structure
-                g2d.setColor(ON_SURFACE);
-                g2d.drawString((i + 1) + ".", 30, yOffset);
-                g2d.drawString(ld.name, 60, yOffset);
-
-                g2d.setColor(PRIMARY);
-                g2d.drawString(String.format("%.2f kg", ld.score), 280, yOffset);
-
-                // Spacing instead of borders
-                yOffset += 35;
-            }
         }
     }
 
@@ -180,7 +139,7 @@ public class EcoTrackDashboard extends Frame {
         // 1. Focus Hearth (Functional Hero Section)
         hearth = new FocusHearth();
         hearth.setLayout(null);
-        hearth.setBounds(100, 40, 850, 140);
+        hearth.setBounds(100, 40, 824, 140);
 
         Label greeting = new Label("Carbon Focus");
         greeting.setFont(new Font("SansSerif", Font.BOLD, 36));
@@ -191,7 +150,7 @@ public class EcoTrackDashboard extends Frame {
         Label targetLabel = new Label("Daily Target: " + DAILY_TARGET + " kg");
         targetLabel.setFont(new Font("SansSerif", Font.PLAIN, 18));
         targetLabel.setForeground(PRIMARY);
-        targetLabel.setBounds(650, 30, 200, 30);
+        targetLabel.setBounds(600, 30, 200, 30);
         hearth.add(targetLabel);
 
         add(hearth);
@@ -204,11 +163,11 @@ public class EcoTrackDashboard extends Frame {
         Label taskLabel = new Label("Log Activity");
         taskLabel.setFont(new Font("SansSerif", Font.BOLD, 22));
         taskLabel.setForeground(ON_SURFACE);
-        taskLabel.setBounds(30, 30, 200, 30);
+        taskLabel.setBounds(30, 40, 200, 30);
         inputCard.add(taskLabel);
 
         activityChoice = new Choice();
-        activityChoice.setBounds(30, 80, 340, 40);
+        activityChoice.setBounds(30, 100, 340, 40);
         activityChoice.setFont(new Font("SansSerif", Font.PLAIN, 16));
 
         // Populate dynamically from DB keys
@@ -222,66 +181,53 @@ public class EcoTrackDashboard extends Frame {
         Label amountLabel = new Label("Quantity:");
         amountLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         amountLabel.setForeground(ON_SURFACE);
-        amountLabel.setBounds(30, 140, 100, 20);
+        amountLabel.setBounds(30, 170, 100, 20);
         inputCard.add(amountLabel);
 
-        // Restore Eco-Slider
+        // Eco-Slider
         ecoSlider = new Scrollbar(Scrollbar.HORIZONTAL, 0, 1, 0, 101);
-        ecoSlider.setBounds(30, 170, 280, 20);
+        ecoSlider.setBounds(30, 200, 280, 20);
         ecoSlider.addAdjustmentListener(e -> updateLiveProjection());
         inputCard.add(ecoSlider);
 
         sliderValueLabel = new Label("0");
         sliderValueLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
         sliderValueLabel.setForeground(ON_SURFACE);
-        sliderValueLabel.setBounds(330, 165, 40, 30);
+        sliderValueLabel.setBounds(330, 195, 40, 30);
         inputCard.add(sliderValueLabel);
 
         // Live feedback loop before clicking
         projectionLabel = new Label("+ 0.00 kg projected");
         projectionLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         projectionLabel.setForeground(TERTIARY);
-        projectionLabel.setBounds(30, 200, 200, 20);
+        projectionLabel.setBounds(30, 230, 200, 20);
         inputCard.add(projectionLabel);
 
         PrimaryButton logBtn = new PrimaryButton("Record Impact");
-        logBtn.setBounds(30, 300, 340, 50);
+        logBtn.setBounds(30, 320, 340, 50);
         logBtn.setActionListener(this::handleLogActivity);
         inputCard.add(logBtn);
 
         add(inputCard);
 
-        // 3. Live Gauge (Hero Metric)
+        // 3. Live Gauge (Hero Metric - Expanded vertically to balance layout)
         TonalCard gaugeCard = new TonalCard(SURFACE_CONTAINER_LOW);
         gaugeCard.setLayout(null);
-        gaugeCard.setBounds(550, 220, 400, 180);
+        gaugeCard.setBounds(524, 220, 400, 400);
 
         Label gaugeTitle = new Label("Today's Output");
-        gaugeTitle.setFont(new Font("SansSerif", Font.BOLD, 18));
+        gaugeTitle.setFont(new Font("SansSerif", Font.BOLD, 22));
         gaugeTitle.setForeground(ON_SURFACE);
-        gaugeTitle.setBounds(30, 20, 200, 30);
+        gaugeTitle.setBounds(40, 40, 200, 30);
         gaugeCard.add(gaugeTitle);
 
         liveMeterLabel = new Label("0.00 kg", Label.LEFT);
         liveMeterLabel.setFont(new Font("SansSerif", Font.BOLD, 64)); // Dominates panel
         liveMeterLabel.setForeground(PRIMARY); // Default Teal
-        liveMeterLabel.setBounds(30, 60, 340, 90);
+        liveMeterLabel.setBounds(40, 150, 340, 90);
         gaugeCard.add(liveMeterLabel);
 
         add(gaugeCard);
-
-        // 4. Leaderboard (Structured Fake Table)
-        leaderboardPanel = new LeaderboardPanel(SURFACE_CONTAINER_LOW);
-        leaderboardPanel.setLayout(null);
-        leaderboardPanel.setBounds(550, 440, 400, 300);
-
-        Label leaderTitle = new Label("Community Leaders");
-        leaderTitle.setFont(new Font("SansSerif", Font.BOLD, 18));
-        leaderTitle.setForeground(ON_SURFACE);
-        leaderTitle.setBounds(30, 20, 200, 30);
-        leaderboardPanel.add(leaderTitle);
-
-        add(leaderboardPanel);
 
         addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent we) {
@@ -289,7 +235,6 @@ public class EcoTrackDashboard extends Frame {
             }
         });
 
-        loadLeaderboard();
         loadDailyTotal();
     }
 
@@ -324,15 +269,6 @@ public class EcoTrackDashboard extends Frame {
                 ecoSlider.setValue(0);
                 updateLiveProjection();
             });
-
-            loadLeaderboard();
-        }).start();
-    }
-
-    private void loadLeaderboard() {
-        new Thread(() -> {
-            List<DatabaseManager.LeaderData> leaders = dbManager.getTopUsersData();
-            EventQueue.invokeLater(() -> leaderboardPanel.updateLeaders(leaders));
         }).start();
     }
 

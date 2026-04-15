@@ -27,14 +27,14 @@ We have overhauled the calculation and UI feedback loop to prevent AWT UI freezi
 3. **Asynchronous Execution**: Upon clicking "Record Impact", a background `Thread` is spawned.
 3. **Secure Retrieval**: `DatabaseManager` runs a `PreparedStatement` to securely fetch the specific emission factor.
 4. **Calculations**: `Total CO2 = Quantity * (Factor / 1000.0)`.
-5. **State Updates**: Data is logged to the DB, and `EventQueue.invokeLater()` is dispatched to safely update the GUI (Live Gauge and Leaderboard).
+5. **State Updates**: Data is logged to the DB, and `EventQueue.invokeLater()` is dispatched to safely update the GUI.
 
 ## The Layout (1024x768 Asymmetric Grid)
 
 The UI uses `setLayout(null)` to enforce an intentional, magazine-style layout with generous left margins:
-- **Focus Hearth (`100, 40`)**: A wide top banner creating a warm, editorial greeting.
-- **Input Tonal Card (`100, 240`)**: Stacked cleanly on the left.
-- **Live Gauge & Community Leaders (`550, 240` & `550, 440`)**: Tucked to the right to provide real-time competitive metrics.
+- **Focus Hearth (`100, 40`)**: A wide top banner creating a warm, editorial greeting with a functional daily target progress bar.
+- **Input Tonal Card (`100, 220`)**: The primary interaction layer stacked cleanly on the left.
+- **Live Gauge Card (`524, 220`)**: A massive hero metric panel on the right, providing a balanced two-column composition.
 
 ## How to Compile and Run
 

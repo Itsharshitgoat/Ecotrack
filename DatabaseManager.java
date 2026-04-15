@@ -90,30 +90,6 @@ public class DatabaseManager {
         }
     }
 
-    // Return structured LeaderData instead of raw strings for custom painting
-    public static class LeaderData {
-        public String name;
-        public double score;
-        public LeaderData(String name, double score) {
-            this.name = name; this.score = score;
-        }
-    }
-
-    public List<LeaderData> getTopUsersData() {
-        List<LeaderData> leaders = new ArrayList<>();
-        String query = "SELECT username, total_score FROM users ORDER BY total_score ASC LIMIT 5";
-        try (Connection conn = connect();
-             PreparedStatement pstmt = conn.prepareStatement(query);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                leaders.add(new LeaderData(rs.getString("username"), rs.getDouble("total_score")));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return leaders;
-    }
-
     public double getDailyTotalForUser(int userId) {
         String query = "SELECT SUM(calculated_co2) as daily_total FROM activity_logs WHERE user_id = ? AND activity_date = CURDATE()";
         try (Connection conn = connect();
