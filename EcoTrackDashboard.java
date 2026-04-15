@@ -1,26 +1,37 @@
 import java.awt.*;
 import java.awt.event.*;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 public class EcoTrackDashboard extends Frame {
     // "Modern Eames" Palette
-    private final Color SURFACE = new Color(252, 249, 244);           // #fcf9f4 (Base Tier)
-    private final Color SURFACE_CONTAINER_LOW = new Color(246, 243, 238); // #f6f3ee (Cards)
+    private final Color SURFACE = new Color(252, 249, 244);           // #fcf9f4 (Background)
+    private final Color SURFACE_CONTAINER_LOW = new Color(246, 243, 238); // #f6f3ee (Cards - clear lift)
     private final Color SURFACE_CONTAINER_HIGH = new Color(229, 226, 221); // #e5e2dd (Focus Hearth)
-    private final Color PRIMARY = new Color(48, 99, 97);              // #306361 (Muted Teal)
+    private final Color PRIMARY = new Color(48, 99, 97);              // #306361 (Teal)
     private final Color TERTIARY = new Color(142, 71, 50);            // #8e4732 (Terracotta)
-    private final Color ON_SURFACE = new Color(28, 28, 25);           // #1c1c19 (Text, not pure black)
+    private final Color WARM_YELLOW = new Color(229, 182, 94);        // #e5b65e (Warning)
+    private final Color ON_SURFACE = new Color(28, 28, 25);           // #1c1c19 (Text)
 
     private DatabaseManager dbManager;
     private double dailyCo2Total = 0.0;
+    private final double DAILY_TARGET = 5.0; // 5 kg target
     private int currentUserId = 1;
+
+    // Live UI State
+    private Map<String, Double> emissionFactorsCache;
 
     // UI Components
     private Choice activityChoice;
-    private TextField ecoInput; // Replaced Scrollbar with text input for cleaner "Input Field" styling
+    private Scrollbar ecoSlider;
+    private Label sliderValueLabel;
+    private Label projectionLabel;
     private Label liveMeterLabel;
-    private List leaderboardList;
+    private LeaderboardPanel leaderboardPanel;
+    private FocusHearth hearth;
 
-    // Custom Component: Tonal Card (No Borders, Rounded, Background Shift)
+    // Custom Component: Tonal Card
     class TonalCard extends Panel {
         private Color bgColor;
         public TonalCard(Color bgColor) {
@@ -31,31 +42,86 @@ public class EcoTrackDashboard extends Frame {
             Graphics2D g2d = (Graphics2D) g;
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2d.setColor(bgColor);
-            g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 24, 24); // Smooth rounded corners
+            g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 24, 24);
             super.paint(g);
         }
     }
 
-    // Custom Component: Focus Hearth (The greeting area with Terracotta accent)
+    // Custom Component: Focus Hearth (Functional Daily Target)
     class FocusHearth extends Panel {
+        private double currentTotal = 0.0;
+
+        public void updateProgress(double total) {
+            this.currentTotal = total;
+            repaint();
+        }
+
         @Override
         public void paint(Graphics g) {
             Graphics2D g2d = (Graphics2D) g;
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            // Base high tier background
             g2d.setColor(SURFACE_CONTAINER_HIGH);
             g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 30, 30);
 
-            // Soft terracotta glow/accent (bleeding edge feel)
-            g2d.setColor(new Color(142, 71, 50, 40)); // Low opacity terracotta
-            g2d.fillOval(getWidth() - 150, -50, 200, 200);
+            // Progress Bar Track
+            int barWidth = getWidth() - 80;
+            g2d.setColor(SURFACE_CONTAINER_LOW);
+            g2d.fillRoundRect(40, 100, barWidth, 12, 12, 12);
+
+            // Progress Bar Fill
+            double ratio = Math.min(currentTotal / DAILY_TARGET, 1.0);
+            int fillWidth = (int) (barWidth * ratio);
+
+            Color fillColor = PRIMARY;
+            if (currentTotal > 2.0 && currentTotal <= 5.0) fillColor = WARM_YELLOW;
+            else if (currentTotal > 5.0) fillColor = TERTIARY;
+
+            g2d.setColor(fillColor);
+            g2d.fillRoundRect(40, 100, fillWidth, 12, 12, 12);
 
             super.paint(g);
         }
     }
 
-    // Custom Component: Primary Button
+    // Custom Component: Structured Leaderboard Panel
+    class LeaderboardPanel extends TonalCard {
+        private List<DatabaseManager.LeaderData> leaders = new ArrayList<>();
+
+        public LeaderboardPanel(Color bgColor) {
+            super(bgColor);
+        }
+
+        public void updateLeaders(List<DatabaseManager.LeaderData> newLeaders) {
+            this.leaders = newLeaders;
+            repaint();
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            super.paint(g);
+            Graphics2D g2d = (Graphics2D) g;
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            g2d.setFont(new Font("SansSerif", Font.PLAIN, 16));
+            int yOffset = 70;
+
+            for (int i = 0; i < leaders.size(); i++) {
+                DatabaseManager.LeaderData ld = leaders.get(i);
+                // Fake table structure
+                g2d.setColor(ON_SURFACE);
+                g2d.drawString((i + 1) + ".", 30, yOffset);
+                g2d.drawString(ld.name, 60, yOffset);
+
+                g2d.setColor(PRIMARY);
+                g2d.drawString(String.format("%.2f kg", ld.score), 280, yOffset);
+
+                // Spacing instead of borders
+                yOffset += 35;
+            }
+        }
+    }
+
     class PrimaryButton extends Component {
         private String label;
         private boolean isHovered = false;
@@ -75,12 +141,10 @@ public class EcoTrackDashboard extends Frame {
             Graphics2D g2d = (Graphics2D) g;
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            // Gradient fill from primary to a slightly lighter teal
-            GradientPaint gp = new GradientPaint(0, 0, PRIMARY, getWidth(), getHeight(), new Color(74, 124, 122));
+            GradientPaint gp = new GradientPaint(0, 0, PRIMARY, getWidth(), getHeight(), isHovered ? new Color(74, 124, 122) : PRIMARY);
             g2d.setPaint(gp);
-            g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 24, 24); // xl roundedness
+            g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 24, 24);
 
-            // Text
             g2d.setColor(SURFACE);
             g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
             FontMetrics fm = g2d.getFontMetrics();
@@ -91,7 +155,13 @@ public class EcoTrackDashboard extends Frame {
 
         @Override
         protected void processMouseEvent(MouseEvent e) {
-            if (e.getID() == MouseEvent.MOUSE_CLICKED && listener != null) {
+            if (e.getID() == MouseEvent.MOUSE_ENTERED) {
+                isHovered = true;
+                repaint();
+            } else if (e.getID() == MouseEvent.MOUSE_EXITED) {
+                isHovered = false;
+                repaint();
+            } else if (e.getID() == MouseEvent.MOUSE_CLICKED && listener != null) {
                 listener.actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, label));
             }
             super.processMouseEvent(e);
@@ -100,120 +170,119 @@ public class EcoTrackDashboard extends Frame {
 
     public EcoTrackDashboard() {
         dbManager = new DatabaseManager();
+        emissionFactorsCache = dbManager.getAllEmissionFactors();
 
         setTitle("EcoTrack - The Modern Eames");
         setSize(1024, 768);
-        setBackground(SURFACE);
-        setLayout(null); // Absolute positioning for editorial layout
+        setBackground(SURFACE); // Base tier
+        setLayout(null); // Ruthless alignment
 
-        // 1. The Focus Hearth (Top Area)
-        // Intentional Asymmetry: Wide left margin (100), tight right margin
-        FocusHearth hearth = new FocusHearth();
+        // 1. Focus Hearth (Functional Hero Section)
+        hearth = new FocusHearth();
         hearth.setLayout(null);
-        hearth.setBounds(100, 40, 850, 160);
+        hearth.setBounds(100, 40, 850, 140);
 
-        Label greeting = new Label("Good morning.");
-        greeting.setFont(new Font("SansSerif", Font.BOLD, 42)); // display-lg proxy
+        Label greeting = new Label("Carbon Focus");
+        greeting.setFont(new Font("SansSerif", Font.BOLD, 36));
         greeting.setForeground(ON_SURFACE);
-        greeting.setBounds(40, 30, 400, 50);
+        greeting.setBounds(40, 20, 300, 50);
         hearth.add(greeting);
 
-        Label subGreeting = new Label("Here is your carbon focus for the day.");
-        subGreeting.setFont(new Font("SansSerif", Font.PLAIN, 18));
-        subGreeting.setForeground(PRIMARY);
-        subGreeting.setBounds(42, 90, 400, 30);
-        hearth.add(subGreeting);
+        Label targetLabel = new Label("Daily Target: " + DAILY_TARGET + " kg");
+        targetLabel.setFont(new Font("SansSerif", Font.PLAIN, 18));
+        targetLabel.setForeground(PRIMARY);
+        targetLabel.setBounds(650, 30, 200, 30);
+        hearth.add(targetLabel);
 
         add(hearth);
 
-        // 2. Input Section (Left side stacked paper)
-        TonalCard inputCard = new TonalCard(SURFACE_CONTAINER_LOW);
+        // 2. Input Section (Living System UX)
+        TonalCard inputCard = new TonalCard(SURFACE_CONTAINER_LOW); // Clear lift
         inputCard.setLayout(null);
-        inputCard.setBounds(100, 240, 400, 360);
+        inputCard.setBounds(100, 220, 400, 400);
 
         Label taskLabel = new Label("Log Activity");
-        taskLabel.setFont(new Font("SansSerif", Font.BOLD, 22)); // title-md proxy
+        taskLabel.setFont(new Font("SansSerif", Font.BOLD, 22));
         taskLabel.setForeground(ON_SURFACE);
         taskLabel.setBounds(30, 30, 200, 30);
         inputCard.add(taskLabel);
 
-        // Dropdown
         activityChoice = new Choice();
-        activityChoice.setBounds(30, 90, 340, 40);
+        activityChoice.setBounds(30, 80, 340, 40);
         activityChoice.setFont(new Font("SansSerif", Font.PLAIN, 16));
-        activityChoice.add("Driving (Car)");
-        activityChoice.add("Public Transit");
-        activityChoice.add("Shower");
-        activityChoice.add("Meat Meal");
 
-        activityChoice.addItemListener(new ItemListener() {
-            public void itemStateChanged(ItemEvent e) {
-                // UI interaction on choice change
-            }
-        });
+        // Populate dynamically from DB keys
+        for (String key : emissionFactorsCache.keySet()) {
+            activityChoice.add(key);
+        }
+
+        activityChoice.addItemListener(e -> updateLiveProjection());
         inputCard.add(activityChoice);
 
-        // Input Field (Replacing slider for editorial cleanliness)
-        Label amountLabel = new Label("Quantity (Units):");
+        Label amountLabel = new Label("Quantity:");
         amountLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         amountLabel.setForeground(ON_SURFACE);
-        amountLabel.setBounds(30, 150, 200, 20);
+        amountLabel.setBounds(30, 140, 100, 20);
         inputCard.add(amountLabel);
 
-        ecoInput = new TextField("");
-        ecoInput.setFont(new Font("SansSerif", Font.PLAIN, 16));
-        ecoInput.setBounds(30, 180, 340, 30);
-        ecoInput.setBackground(SURFACE_CONTAINER_HIGH); // Input background
-        // Removing borders in AWT TextField is hard, so we rely on background contrast
-        inputCard.add(ecoInput);
+        // Restore Eco-Slider
+        ecoSlider = new Scrollbar(Scrollbar.HORIZONTAL, 0, 1, 0, 101);
+        ecoSlider.setBounds(30, 170, 280, 20);
+        ecoSlider.addAdjustmentListener(e -> updateLiveProjection());
+        inputCard.add(ecoSlider);
+
+        sliderValueLabel = new Label("0");
+        sliderValueLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+        sliderValueLabel.setForeground(ON_SURFACE);
+        sliderValueLabel.setBounds(330, 165, 40, 30);
+        inputCard.add(sliderValueLabel);
+
+        // Live feedback loop before clicking
+        projectionLabel = new Label("+ 0.00 kg projected");
+        projectionLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        projectionLabel.setForeground(TERTIARY);
+        projectionLabel.setBounds(30, 200, 200, 20);
+        inputCard.add(projectionLabel);
 
         PrimaryButton logBtn = new PrimaryButton("Record Impact");
-        logBtn.setBounds(30, 260, 340, 50);
+        logBtn.setBounds(30, 300, 340, 50);
         logBtn.setActionListener(this::handleLogActivity);
         inputCard.add(logBtn);
 
         add(inputCard);
 
-        // 3. Live Gauge (Right side, top)
+        // 3. Live Gauge (Hero Metric)
         TonalCard gaugeCard = new TonalCard(SURFACE_CONTAINER_LOW);
         gaugeCard.setLayout(null);
-        gaugeCard.setBounds(550, 240, 400, 160);
+        gaugeCard.setBounds(550, 220, 400, 180);
 
         Label gaugeTitle = new Label("Today's Output");
-        gaugeTitle.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        gaugeTitle.setForeground(TERTIARY); // Soft terracotta accent
-        gaugeTitle.setBounds(30, 20, 200, 20);
+        gaugeTitle.setFont(new Font("SansSerif", Font.BOLD, 18));
+        gaugeTitle.setForeground(ON_SURFACE);
+        gaugeTitle.setBounds(30, 20, 200, 30);
         gaugeCard.add(gaugeTitle);
 
         liveMeterLabel = new Label("0.00 kg", Label.LEFT);
-        liveMeterLabel.setFont(new Font("SansSerif", Font.BOLD, 48)); // display-lg
-        liveMeterLabel.setForeground(ON_SURFACE);
-        liveMeterLabel.setBounds(30, 50, 340, 70);
+        liveMeterLabel.setFont(new Font("SansSerif", Font.BOLD, 64)); // Dominates panel
+        liveMeterLabel.setForeground(PRIMARY); // Default Teal
+        liveMeterLabel.setBounds(30, 60, 340, 90);
         gaugeCard.add(liveMeterLabel);
 
         add(gaugeCard);
 
-        // 4. Leaderboard (Right side, bottom)
-        TonalCard leaderCard = new TonalCard(SURFACE_CONTAINER_LOW);
-        leaderCard.setLayout(null);
-        leaderCard.setBounds(550, 440, 400, 260);
+        // 4. Leaderboard (Structured Fake Table)
+        leaderboardPanel = new LeaderboardPanel(SURFACE_CONTAINER_LOW);
+        leaderboardPanel.setLayout(null);
+        leaderboardPanel.setBounds(550, 440, 400, 300);
 
         Label leaderTitle = new Label("Community Leaders");
         leaderTitle.setFont(new Font("SansSerif", Font.BOLD, 18));
         leaderTitle.setForeground(ON_SURFACE);
         leaderTitle.setBounds(30, 20, 200, 30);
-        leaderCard.add(leaderTitle);
+        leaderboardPanel.add(leaderTitle);
 
-        leaderboardList = new List();
-        leaderboardList.setBounds(30, 60, 340, 170);
-        leaderboardList.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        leaderboardList.setBackground(SURFACE_CONTAINER_LOW);
-        leaderboardList.setForeground(PRIMARY);
-        leaderCard.add(leaderboardList);
+        add(leaderboardPanel);
 
-        add(leaderCard);
-
-        // Window Closing
         addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent we) {
                 System.exit(0);
@@ -221,66 +290,73 @@ public class EcoTrackDashboard extends Frame {
         });
 
         loadLeaderboard();
-        loadDailyTotal(); // Fetch initial today's total if app restarts
+        loadDailyTotal();
+    }
+
+    private void updateLiveProjection() {
+        int qty = ecoSlider.getValue();
+        sliderValueLabel.setText(String.valueOf(qty));
+
+        String activity = activityChoice.getSelectedItem();
+        double factor = emissionFactorsCache.getOrDefault(activity, 0.0);
+        double projected = qty * (factor / 1000.0);
+
+        projectionLabel.setText(String.format("+ %.2f kg projected", projected));
     }
 
     private void handleLogActivity(ActionEvent e) {
         String selectedActivity = activityChoice.getSelectedItem();
-        String inputStr = ecoInput.getText().trim();
-
-        if (inputStr.isEmpty()) return;
-
-        double quantity;
-        try {
-            quantity = Double.parseDouble(inputStr);
-        } catch (NumberFormatException ex) {
-            System.err.println("Invalid numeric input");
-            return;
-        }
+        int quantity = ecoSlider.getValue();
 
         if (quantity <= 0) return;
 
-        // DB operations on background thread
+        // DB operations
         new Thread(() -> {
             double factor = dbManager.getFactorForActivity(selectedActivity);
-
-            // Formula: Input * (Emission Factor / 1000)
             double calculatedCo2 = quantity * (factor / 1000.0);
 
             dbManager.logActivity(currentUserId, selectedActivity, quantity, calculatedCo2);
 
-            dailyCo2Total += calculatedCo2;
-
             EventQueue.invokeLater(() -> {
-                liveMeterLabel.setText(String.format("%.2f kg", dailyCo2Total));
-                ecoInput.setText("");
+                updateOutputMetric(dailyCo2Total + calculatedCo2);
+
+                // Reset UX
+                ecoSlider.setValue(0);
+                updateLiveProjection();
             });
 
-            // Refresh leaderboard
             loadLeaderboard();
         }).start();
     }
 
     private void loadLeaderboard() {
         new Thread(() -> {
-            java.util.List<String> leaders = dbManager.getTopUsers();
-            EventQueue.invokeLater(() -> {
-                leaderboardList.removeAll();
-                for (String leader : leaders) {
-                    leaderboardList.add(leader);
-                }
-            });
+            List<DatabaseManager.LeaderData> leaders = dbManager.getTopUsersData();
+            EventQueue.invokeLater(() -> leaderboardPanel.updateLeaders(leaders));
         }).start();
     }
 
     private void loadDailyTotal() {
         new Thread(() -> {
             double total = dbManager.getDailyTotalForUser(currentUserId);
-            dailyCo2Total = total;
-            EventQueue.invokeLater(() -> {
-                liveMeterLabel.setText(String.format("%.2f kg", dailyCo2Total));
-            });
+            EventQueue.invokeLater(() -> updateOutputMetric(total));
         }).start();
+    }
+
+    private void updateOutputMetric(double newTotal) {
+        dailyCo2Total = newTotal;
+        liveMeterLabel.setText(String.format("%.2f kg", dailyCo2Total));
+
+        // Dynamic Color Urgency
+        if (dailyCo2Total <= 2.0) {
+            liveMeterLabel.setForeground(PRIMARY);
+        } else if (dailyCo2Total <= 5.0) {
+            liveMeterLabel.setForeground(WARM_YELLOW);
+        } else {
+            liveMeterLabel.setForeground(TERTIARY);
+        }
+
+        hearth.updateProgress(dailyCo2Total);
     }
 
     public static void main(String[] args) {

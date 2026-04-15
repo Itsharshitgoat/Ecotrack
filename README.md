@@ -20,10 +20,11 @@ We enforce a strict "No-Line" rule. Layout boundaries are achieved through subtl
 
 The backend relies on MySQL (`users`, `emission_factors`, `activity_logs`).
 
-**Thread-Safe Event Logic:**
-We have overhauled the calculation and dropdown logic to prevent AWT UI freezing and calculation errors:
-1. **Input**: Quantities are captured via a clean `TextField` rather than a slider.
-2. **Asynchronous Execution**: Upon clicking "Record Impact", a background `Thread` is spawned.
+**Living System UX & Thread-Safe Event Logic:**
+We have overhauled the calculation and UI feedback loop to prevent AWT UI freezing and provide immediate, real-time feedback:
+1. **Input**: Quantities are captured via an interactive `Scrollbar` (Eco-Slider).
+2. **Live Feedback**: As the slider moves, an `AdjustmentListener` fetches a locally cached emission factor to immediately update a "projected CO2" label, allowing the user to see the impact before committing to the DB.
+3. **Asynchronous Execution**: Upon clicking "Record Impact", a background `Thread` is spawned.
 3. **Secure Retrieval**: `DatabaseManager` runs a `PreparedStatement` to securely fetch the specific emission factor.
 4. **Calculations**: `Total CO2 = Quantity * (Factor / 1000.0)`.
 5. **State Updates**: Data is logged to the DB, and `EventQueue.invokeLater()` is dispatched to safely update the GUI (Live Gauge and Leaderboard).

@@ -4,10 +4,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class DatabaseManager {
-    // Environment variables with fallbacks
     private static final String URL = System.getenv("ECOTRACK_DB_URL") != null ? System.getenv("ECOTRACK_DB_URL") : "jdbc:mysql://localhost:3306/ecotrack";
     private static final String USER = System.getenv("ECOTRACK_DB_USER") != null ? System.getenv("ECOTRACK_DB_USER") : "root";
     private static final String PASS = System.getenv("ECOTRACK_DB_PASS") != null ? System.getenv("ECOTRACK_DB_PASS") : "password";
@@ -28,6 +29,22 @@ public class DatabaseManager {
             e.printStackTrace();
             return false;
         }
+    }
+
+    // Cached fetch for zero-latency live UI calculations
+    public Map<String, Double> getAllEmissionFactors() {
+        Map<String, Double> factors = new HashMap<>();
+        String query = "SELECT activity_type, co2_per_unit FROM emission_factors";
+        try (Connection conn = connect();
+             PreparedStatement pstmt = conn.prepareStatement(query);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                factors.put(rs.getString("activity_type"), rs.getDouble("co2_per_unit"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return factors;
     }
 
     public double getFactorForActivity(String activityType) {
@@ -73,14 +90,23 @@ public class DatabaseManager {
         }
     }
 
-    public List<String> getTopUsers() {
-        List<String> leaders = new ArrayList<>();
+    // Return structured LeaderData instead of raw strings for custom painting
+    public static class LeaderData {
+        public String name;
+        public double score;
+        public LeaderData(String name, double score) {
+            this.name = name; this.score = score;
+        }
+    }
+
+    public List<LeaderData> getTopUsersData() {
+        List<LeaderData> leaders = new ArrayList<>();
         String query = "SELECT username, total_score FROM users ORDER BY total_score ASC LIMIT 5";
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(query);
              ResultSet rs = pstmt.executeQuery()) {
             while (rs.next()) {
-                leaders.add(rs.getString("username") + " - " + String.format("%.2f kg", rs.getDouble("total_score")));
+                leaders.add(new LeaderData(rs.getString("username"), rs.getDouble("total_score")));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -88,7 +114,6 @@ public class DatabaseManager {
         return leaders;
     }
 
-    // Feature added to ensure "Live Meter" accuracy upon app restarts
     public double getDailyTotalForUser(int userId) {
         String query = "SELECT SUM(calculated_co2) as daily_total FROM activity_logs WHERE user_id = ? AND activity_date = CURDATE()";
         try (Connection conn = connect();
