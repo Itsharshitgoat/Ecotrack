@@ -1,72 +1,57 @@
-# EcoTrack - Night Owl Edition
+# EcoTrack - "Modern Eames" Edition
 
-**EcoTrack** is a Java-based desktop application designed to function as a Carbon Footprint Calculator. In this edition, we have completely overhauled the visual identity to feature a "Night Owl Glassmorphism" aesthetic, while strictly adhering to Java AWT (Abstract Window Toolkit) without utilizing Swing. The backend remains robust, powered by a secure MySQL database.
+**EcoTrack** is a Java-based desktop Carbon Footprint Calculator. This version abandons standard digital layouts in favor of the **"Modern Eames"** design philosophy—a system prioritizing functional warmth, intentional asymmetry, and deep editorial typography, entirely constructed within the constraints of Java AWT (no Swing).
 
-## Visual Identity: The Night Owl Palette
+## Visual Identity: The Modern Eames Palette
 
-The application uses deep dark tones with vibrant accents to achieve a modern, high-end look:
+The application uses tonal depth and an organic mid-century modern aesthetic:
 
-- **Deep Background** (`#011627`): Main Frame Background
-- **Glass Panel** (`#0B2942`): Used for `GlassPanel` overlays to simulate semi-transparent containers (`alpha = 180`).
-- **Electric Blue** (`#82AAFF`): Active Buttons / Highlights
-- **Soft Purple** (`#C792EA`): Data Labels / Accents
-- **Text White** (`#D6DEEB`): Primary Readability
+- **Surface (`#fcf9f4`)**: The main application background.
+- **Surface Container Low (`#f6f3ee`)**: Used for task cards and input fields.
+- **Surface Container Highest (`#e5e2dd`)**: The Focus Hearth container.
+- **Primary / Teal (`#306361`)**: Core CTA elements and gradients.
+- **Tertiary / Terracotta (`#8e4732`)**: Used for soft, organic accents.
+- **On-Surface (`#1c1c19`)**: High-legibility, off-black text.
 
-### Glassmorphism in AWT
-Because AWT components are heavyweight and rendered by the OS, true transparency and opacity manipulation is difficult. To simulate the "Glass" effect, we override the `paint` method of a custom `Panel` (`GlassPanel`). We draw a semi-transparent rounded rectangle accompanied by a subtle glowing border.
+### The "No-Line" Rule & Custom AWT Overrides
+We enforce a strict "No-Line" rule. Layout boundaries are achieved through subtle background shifts (Tonal Stacking) rather than 1px borders. To achieve rounded, borderless UI elements in AWT, we override the `paint` methods of `Panel` components to render anti-aliased `Graphics2D` rounded rectangles (`TonalCard` and `FocusHearth`).
 
-## Database Schema
+## Database Architecture & Logic Fixes
 
-The backend is supported by a MySQL database using the following 3 core tables:
+The backend relies on MySQL (`users`, `emission_factors`, `activity_logs`).
 
-1. **`users`**: Stores `user_id`, `username`, `password_hash`, and `total_score`.
-2. **`emission_factors`**: Acts as a dynamic reference to map an `activity_type` to its `co2_per_unit` factor.
-3. **`activity_logs`**: Represents a daily log, securely storing `user_id`, `activity_date`, `activity_type`, `quantity`, and `calculated_co2`.
+**Thread-Safe Event Logic:**
+We have overhauled the calculation and dropdown logic to prevent AWT UI freezing and calculation errors:
+1. **Input**: Quantities are captured via a clean `TextField` rather than a slider.
+2. **Asynchronous Execution**: Upon clicking "Record Impact", a background `Thread` is spawned.
+3. **Secure Retrieval**: `DatabaseManager` runs a `PreparedStatement` to securely fetch the specific emission factor.
+4. **Calculations**: `Total CO2 = Quantity * (Factor / 1000.0)`.
+5. **State Updates**: Data is logged to the DB, and `EventQueue.invokeLater()` is dispatched to safely update the GUI (Live Gauge and Leaderboard).
 
-You can set up the database using the provided `schema.sql` file.
+## The Layout (1024x768 Asymmetric Grid)
 
-## UI/UX Architecture (Coordinate-Based Grid System)
-
-The layout has been meticulously mapped onto a $1024 \times 768$ absolute layout (`setLayout(null)`) for precise element placement:
-
-- **Header Section** `(0, 0) to (1024, 80)`: Darkest Navy background featuring the EcoTrack title in Electric Blue.
-- **Input Panel (Glass Section)** `(50, 120) to (450, 600)`: Hosts the interactive elements: a dropdown for the activity, an Eco-Slider for quantity selection, and the action button. An `ItemListener` tracks dropdown changes.
-- **Real-time Gauge Panel** `(550, 120) to (950, 400)`: Features large text indicating the real-time calculated CO2 output.
-- **Leaderboard Table Panel** `(550, 450) to (950, 700)`: Retrieves and lists the top "greenest" users.
-
-## Calculation Engine and Event Flow
-
-The mathematical logic has been updated to support standard kg conversion:
-```
-Total CO2 (kg) = Quantity * (Emission Factor / 1000.0)
-```
-
-**Thread Safety & Integration Flow:**
-To prevent AWT's main thread from freezing during database queries, all JDBC actions run asynchronously.
-1. **Extract**: Get the value from the UI controls.
-2. **Fetch**: Execute `SELECT co2_per_unit FROM emission_factors WHERE activity_type = ?` on a background thread.
-3. **Compute**: Perform the calculation.
-4. **Update**: Persist data to `activity_logs` and update the `users` total score, then securely dispatch a UI update back to the EventQueue to update the Gauge and Leaderboard.
+The UI uses `setLayout(null)` to enforce an intentional, magazine-style layout with generous left margins:
+- **Focus Hearth (`100, 40`)**: A wide top banner creating a warm, editorial greeting.
+- **Input Tonal Card (`100, 240`)**: Stacked cleanly on the left.
+- **Live Gauge & Community Leaders (`550, 240` & `550, 440`)**: Tucked to the right to provide real-time competitive metrics.
 
 ## How to Compile and Run
 
 1. **Prerequisites**:
-   - Ensure you have JDK 8+ installed.
-   - You need a MySQL server running locally on port 3306.
-   - You need the MySQL JDBC driver (e.g., `mysql-connector-java-8.0.x.jar`).
+   - JDK 8+ installed.
+   - Local MySQL Server on port 3306.
+   - MySQL JDBC driver (`mysql-connector-java-8.x.x.jar`).
 
 2. **Database Setup**:
-   Execute the `schema.sql` script in your MySQL instance to create the database (`ecotrack`) and the necessary tables.
+   Execute the included `schema.sql` script to create the `ecotrack` database and tables.
 
 3. **Compile**:
-   Compile the Java classes:
    ```bash
    javac -cp ".:mysql-connector-java-8.0.33.jar" DatabaseManager.java EcoTrackDashboard.java
    ```
 
 4. **Run**:
-   Run the `EcoTrackDashboard` class:
    ```bash
    java -cp ".:mysql-connector-java-8.0.33.jar" EcoTrackDashboard
    ```
-   *Note: Modify the classpath separator `;` for Windows, `:` for Unix-based systems.*
+   *(Windows: Use `;` instead of `:` for the classpath separator).*

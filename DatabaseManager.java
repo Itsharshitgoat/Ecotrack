@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DatabaseManager {
-    // Use environment variables for DB connection, fallback to defaults
+    // Environment variables with fallbacks
     private static final String URL = System.getenv("ECOTRACK_DB_URL") != null ? System.getenv("ECOTRACK_DB_URL") : "jdbc:mysql://localhost:3306/ecotrack";
     private static final String USER = System.getenv("ECOTRACK_DB_USER") != null ? System.getenv("ECOTRACK_DB_USER") : "root";
     private static final String PASS = System.getenv("ECOTRACK_DB_PASS") != null ? System.getenv("ECOTRACK_DB_PASS") : "password";
@@ -16,13 +16,12 @@ public class DatabaseManager {
         return DriverManager.getConnection(URL, USER, PASS);
     }
 
-    // Secure Login using PreparedStatement
     public boolean authenticateUser(String username, String password) {
         String query = "SELECT user_id FROM users WHERE username = ? AND password_hash = ?";
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setString(1, username);
-            pstmt.setString(2, password); // In production, hash the password first
+            pstmt.setString(2, password);
             ResultSet rs = pstmt.executeQuery();
             return rs.next();
         } catch (SQLException e) {
@@ -31,7 +30,6 @@ public class DatabaseManager {
         }
     }
 
-    // Dynamic factor fetching on demand
     public double getFactorForActivity(String activityType) {
         String query = "SELECT co2_per_unit FROM emission_factors WHERE activity_type = ?";
         try (Connection conn = connect();
@@ -47,7 +45,6 @@ public class DatabaseManager {
         return 0.0;
     }
 
-    // Secure Insert for Activity Log
     public void logActivity(int userId, String activityType, double quantity, double calculatedCo2) {
         String query = "INSERT INTO activity_logs (user_id, activity_date, activity_type, quantity, calculated_co2) VALUES (?, CURDATE(), ?, ?, ?)";
         try (Connection conn = connect();
@@ -58,7 +55,6 @@ public class DatabaseManager {
             pstmt.setDouble(4, calculatedCo2);
             pstmt.executeUpdate();
 
-            // Optionally update user's total score in the users table
             updateUserScore(userId, calculatedCo2);
         } catch (SQLException e) {
             e.printStackTrace();
@@ -77,7 +73,6 @@ public class DatabaseManager {
         }
     }
 
-    // Fetch top users for leaderboard
     public List<String> getTopUsers() {
         List<String> leaders = new ArrayList<>();
         String query = "SELECT username, total_score FROM users ORDER BY total_score ASC LIMIT 5";
@@ -91,5 +86,21 @@ public class DatabaseManager {
             e.printStackTrace();
         }
         return leaders;
+    }
+
+    // Feature added to ensure "Live Meter" accuracy upon app restarts
+    public double getDailyTotalForUser(int userId) {
+        String query = "SELECT SUM(calculated_co2) as daily_total FROM activity_logs WHERE user_id = ? AND activity_date = CURDATE()";
+        try (Connection conn = connect();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, userId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getDouble("daily_total");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0.0;
     }
 }
