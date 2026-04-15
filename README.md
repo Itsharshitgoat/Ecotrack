@@ -34,7 +34,8 @@ We have overhauled the calculation and UI feedback loop to prevent AWT UI freezi
 The UI uses `setLayout(null)` to enforce an intentional, magazine-style layout with generous left margins:
 - **Focus Hearth (`100, 40`)**: A wide top banner creating a warm, editorial greeting with a functional daily target progress bar.
 - **Input Tonal Card (`100, 220`)**: The primary interaction layer stacked cleanly on the left.
-- **Live Gauge Card (`524, 220`)**: A massive hero metric panel on the right, providing a balanced two-column composition.
+- **Live Gauge Card (`524, 220`)**: A prominent hero metric panel on the right highlighting today's total.
+- **Leaderboard Panel (`524, 440`)**: Displays the Top 5 users with the lowest emissions for the current month.
 
 ## How to Compile and Run
 

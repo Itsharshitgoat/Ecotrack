@@ -104,4 +104,37 @@ public class DatabaseManager {
         }
         return 0.0;
     }
+
+    // Structured LeaderData for custom painting
+    public static class LeaderData {
+        public String name;
+        public double score;
+        public LeaderData(String name, double score) {
+            this.name = name; this.score = score;
+        }
+    }
+
+    // Explicitly fetching Monthly lowest emissions
+    public List<LeaderData> getLowestMonthlyEmissions() {
+        List<LeaderData> leaders = new ArrayList<>();
+        String query = "SELECT u.username, SUM(a.calculated_co2) as monthly_total " +
+                       "FROM activity_logs a " +
+                       "JOIN users u ON a.user_id = u.user_id " +
+                       "WHERE MONTH(a.activity_date) = MONTH(CURDATE()) " +
+                       "AND YEAR(a.activity_date) = YEAR(CURDATE()) " +
+                       "GROUP BY u.username " +
+                       "ORDER BY monthly_total ASC " +
+                       "LIMIT 5";
+
+        try (Connection conn = connect();
+             PreparedStatement pstmt = conn.prepareStatement(query);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                leaders.add(new LeaderData(rs.getString("username"), rs.getDouble("monthly_total")));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return leaders;
+    }
 }

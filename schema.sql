@@ -29,6 +29,16 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
+-- Indexes optimized for leaderboard and daily metrics queries
+CREATE INDEX idx_activity_date ON activity_logs(activity_date);
+CREATE INDEX idx_user_id ON activity_logs(user_id);
+
+-- Insert Initial Users (for dummy leaderboard data)
+INSERT IGNORE INTO users (username, password_hash) VALUES
+('Harshit', 'hash1'),
+('Ankit', 'hash2'),
+('Riya', 'hash3');
+
 -- Insert Initial Emission Factors
 INSERT IGNORE INTO emission_factors (activity_type, co2_per_unit, unit_name) VALUES
 ('Driving (Car)', 0.2100, 'km'),
